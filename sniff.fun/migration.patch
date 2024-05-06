@@ -1,0 +1,67 @@
+--- sources/admin_access.move
++++ sources/admin_access.move
+@@ -8 +8 @@
+-    struct AdminAccess has key {
++    public struct AdminAccess has key {
+@@ -14 +14 @@
+-    struct AdminCap has key, store {
++    public struct AdminCap has key, store {
+--- sources/freezer.move
++++ sources/freezer.move
+@@ -7 +7 @@
+-    struct Ice<T: key + store> has key {
++    public struct Ice<T: key + store> has key {
+--- sources/meme.move
++++ sources/meme.move
+@@ -36 +36 @@
+-    struct BondingCurve<phantom T> has key {
++    public struct BondingCurve<phantom T> has key {
+@@ -47 +47 @@
+-    struct Configurator has key {
++    public struct Configurator has key {
+@@ -59 +59 @@
+-    struct BondingCurveListedEvent has copy, drop {
++    public struct BondingCurveListedEvent has copy, drop {
+@@ -68 +68 @@
+-    struct SwapEvent has copy, drop {
++    public struct SwapEvent has copy, drop {
+@@ -78 +78 @@
+-    struct MigrationPendingEvent has copy, drop {
++    public struct MigrationPendingEvent has copy, drop {
+@@ -85 +85 @@
+-    struct MigrationCompletedEvent has copy, drop {
++    public struct MigrationCompletedEvent has copy, drop {
+@@ -108 +108 @@
+-        tc: TreasuryCap<T>, 
++        mut tc: TreasuryCap<T>, 
+@@ -110 +110 @@
+-        sui_balance: Balance<SUI>,
++        mut sui_balance: Balance<SUI>,
+@@ -145 +145 @@
+-        sui_balance: Balance<SUI>,
++        mut sui_balance: Balance<SUI>,
+@@ -212 +212 @@
+-        let output_balance = balance::split(&mut self.sui_balance, output_amount);
++        let mut output_balance = balance::split(&mut self.sui_balance, output_amount);
+--- sources/safu_receipt.move
++++ sources/safu_receipt.move
+@@ -6,2 +6,2 @@
+-    friend sniff_dot_fun::meme;
+-    friend sniff_dot_fun::kriya_adapter;
++    /* friend sniff_dot_fun::meme; */
++    /* friend sniff_dot_fun::kriya_adapter; */
+@@ -14 +14 @@
+-    struct SafuReceipt<phantom T> {
++    public struct SafuReceipt<phantom T> {
+@@ -24 +24 @@
+-    public(friend) fun mint<T>(
++    public(package) fun mint<T>(
+@@ -44 +44 @@
+-    public(friend) fun extract_assets<T>(
++    public(package) fun extract_assets<T>(
+@@ -57 +57 @@
+-    public(friend) fun burn<T>(self: SafuReceipt<T>): (ID, u64, u64, u64, ID) {
++    public(package) fun burn<T>(self: SafuReceipt<T>): (ID, u64, u64, u64, ID) {
+@@ -77 +77 @@
+-    public(friend) fun target<T>(self: &SafuReceipt<T>): u64 { self.target }
++    public(package) fun target<T>(self: &SafuReceipt<T>): u64 { self.target }
