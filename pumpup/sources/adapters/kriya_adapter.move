@@ -8,7 +8,7 @@ module bonding_curve::kriya_adapter {
     use kdx_spot::add_liquidity;
     use kdx_spot::create_pool;
     use bonding_curve::freezer;
-    use bonding_curve::safu_receipt::{Self, SafuReceipt};
+    use bonding_curve::migration_receipt::{Self, MigrationReceipt};
 
     // constants
     const AdapterId: u64 = 0;
@@ -17,7 +17,7 @@ module bonding_curve::kriya_adapter {
     const EInvalidAdapter: u64 = 0;
 
     public fun process<T>(
-        receipt: &mut SafuReceipt<T>, 
+        receipt: &mut MigrationReceipt<T>, 
         coin_metadata_sui: &CoinMetadata<SUI>,
         coin_metadata_meme: &CoinMetadata<T>,
         config: &DefaultConfig,
@@ -26,7 +26,7 @@ module bonding_curve::kriya_adapter {
         version: &Version,
         ctx: &mut TxContext
     ) {
-        assert!(safu_receipt::target<T>(receipt) == AdapterId, EInvalidAdapter);
+        assert!(migration_receipt::target<T>(receipt) == AdapterId, EInvalidAdapter);
         
         // [1] create new kriya pool.
         let (mut pool, pool_cap) = create_pool::create_pool<SUI, T>(
@@ -40,7 +40,7 @@ module bonding_curve::kriya_adapter {
         );
 
         // [2] add liquidity to pool.
-        let (sui_balance, meme_balance) = safu_receipt::extract_assets(receipt);
+        let (sui_balance, meme_balance) = migration_receipt::extract_assets(receipt);
         let (
             base_coin,
             meme_coin,

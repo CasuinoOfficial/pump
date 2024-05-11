@@ -1,16 +1,13 @@
-module bonding_curve::safu_receipt {
+module bonding_curve::migration_receipt {
     use sui::balance::{Self, Balance};
     use sui::sui::{SUI};
-
-    /* friend sniff_dot_fun::meme; */
-    /* friend sniff_dot_fun::kriya_adapter; */
 
     // error codes
     const EInvalidSuiBalance: u64 = 0;
     const EInvalidMemeBalance: u64 = 1;
     const EReceiptNotEmpty: u64 = 3;
 
-    public struct SafuReceipt<phantom T> {
+    public struct MigrationReceipt<phantom T> {
         bc_id: ID,
         target: u64,
         sui_balance: Balance<SUI>,
@@ -25,11 +22,11 @@ module bonding_curve::safu_receipt {
         sui_balance: Balance<SUI>,
         meme_balance: Balance<T>,
         bc_id: ID,
-    ): SafuReceipt<T> {
+    ): MigrationReceipt<T> {
         assert!(balance::value<SUI>(&sui_balance) > 0, EInvalidSuiBalance);
         assert!(balance::value<T>(&meme_balance) > 0, EInvalidMemeBalance);
 
-        SafuReceipt {
+        MigrationReceipt {
             bc_id: bc_id,
             target: target,
             sui_balance_val: balance::value<SUI>(&sui_balance),
@@ -41,7 +38,7 @@ module bonding_curve::safu_receipt {
     }
 
     public(package) fun extract_assets<T>(
-        self: &mut SafuReceipt<T>
+        self: &mut MigrationReceipt<T>
     ): (Balance<SUI>, Balance<T>) {
         let base_val = balance::value(&self.sui_balance);
         let meme_val = balance::value(&self.meme_balance);
@@ -53,8 +50,8 @@ module bonding_curve::safu_receipt {
     }
 
     #[allow(unused_variable)]
-    public(package) fun burn<T>(self: SafuReceipt<T>): (ID, u64, u64, u64, ID) {
-        let SafuReceipt {
+    public(package) fun burn<T>(self: MigrationReceipt<T>): (ID, u64, u64, u64, ID) {
+        let MigrationReceipt {
             bc_id, 
             target, 
             sui_balance, 
@@ -73,5 +70,5 @@ module bonding_curve::safu_receipt {
         (bc_id, target, sui_balance_val, meme_balance_val, target_pool_id)
     }
 
-    public(package) fun target<T>(self: &SafuReceipt<T>): u64 { self.target }
+    public(package) fun target<T>(self: &MigrationReceipt<T>): u64 { self.target }
 }

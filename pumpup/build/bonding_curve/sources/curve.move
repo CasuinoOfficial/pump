@@ -7,21 +7,26 @@ module bonding_curve::curve {
     use sui::balance::{Self, Balance};
     use sui::sui::{SUI};
     use sui::event;
-    use bonding_curve::safu_receipt::{Self, SafuReceipt};
+    use bonding_curve::migration_receipt::{Self, MigrationReceipt};
     use bonding_curve::freezer;
 
     // error codes
     const ETreasuryCapSupplyNonZero: u64 = 0;
     const ESwapOutLessthanExpected: u64 = 1;
-    const EInvalidMemeDecimals: u64 = 2;
+    const EInvalidTokenDecimals: u64 = 2;
     const EInsufficientSuiBalance: u64 = 3;
     const EPoolNotActiveForTrading: u64 = 4;
     const EInvalidPoolStatePostSwap: u64 = 5;
     const EPoolNotMigratable: u64 = 6;
 
     // constants    
-    const MemeCoinDecimals: u8 = 9;
+    const TokenDecimals: u8 = 9;
     const FeeScaling: u128 = 1_000_000;
+    /// The max value that can be held in one of the Balances of
+    /// a Pool. U64 MAX
+    const MAX_POOL_VALUE: u64 = {
+        18446744073709551615
+    };
 
     // default values
     const DefaultSupply: u64 = 1_000_000_000 * 1_000_000_000;
@@ -34,8 +39,7 @@ module bonding_curve::curve {
     public struct BondingCurve<phantom T> has key {
         id: UID,
         sui_balance: Balance<SUI>,
-        meme_balance: Balance<T>,
-        fee: Balance<SUI>,
+        token_balance: Balance<T>,
         virtual_sui_amt: u64,
         target_supply_threshold: u64,
         swap_fee: u64,
@@ -57,9 +61,9 @@ module bonding_curve::curve {
     // events
     public struct BondingCurveListedEvent has copy, drop {
         object_id: ID,
-        meme_type: String,
+        token_type: String,
         sui_balance_val: u64,
-        meme_balance_val: u64,
+        token_balance_val: u64,
         virtual_sui_amt: u64,
         target_supply_threshold: u64,
         creator: address,
@@ -73,34 +77,33 @@ module bonding_curve::curve {
     public struct Points has copy, drop {
         amount: u64,
         sender: address,
-        bonding_curve: ID
     }
 
     public struct SwapEvent has copy, drop {
         bc_id: ID,
-        meme_type: String,
+        token_type: String,
         is_buy: bool,
         input_amount: u64,
         output_amount: u64,
         sui_reserve_val: u64,
-        meme_reserve_val: u64,
+        token_reserve_val: u64,
         sender: address
     }
 
     public struct MigrationPendingEvent has copy, drop {
         bc_id: ID,
-        meme_type: String,
+        token_type: String,
         sui_reserve_val: u64,
-        meme_reserve_val: u64
+        token_reserve_val: u64
     }
 
     public struct MigrationCompletedEvent has copy, drop {
         adapter_id: u64,
         bc_id: ID,
-        meme_type: String,
+        token_type: String,
         target_pool_id: ID,
         sui_balance_val: u64,
-        meme_balance_val: u64
+        token_balance_val: u64
     }
 
     public struct AdminCap has key, store {
@@ -111,7 +114,6 @@ module bonding_curve::curve {
         let admin = tx_context::sender(ctx);
         let admin_cap = AdminCap { id: object::new(ctx) };
         transfer::transfer(admin_cap, admin);
-
         transfer::share_object(Configurator {
             id: object::new(ctx),
             virtual_sui_amt: DefaultVirtualLiquidity,
@@ -130,14 +132,14 @@ module bonding_curve::curve {
         sui_coin: Coin<SUI>,
         ctx: &mut TxContext
     ): BondingCurve<T> {
-        // total supply of treasury cap should be zero while listing a new meme.
+        // total supply of treasury cap should be zero while listing a new token.
         assert!(coin::total_supply<T>(&tc) == 0, ETreasuryCapSupplyNonZero);
-        assert!(coin::get_decimals<T>(coin_metadata) == MemeCoinDecimals, EInvalidMemeDecimals);
+        assert!(coin::get_decimals<T>(coin_metadata) == TokenDecimals, EInvalidTokenDecimals);
         let mut sui_balance = coin::into_balance(sui_coin);
         assert!(balance::value(&sui_balance) == configurator.listing_fee, EInsufficientSuiBalance);
 
-        // mint meme coins max supply.
-        let meme_balance = coin::mint_balance<T>(&mut tc, DefaultSupply);
+        // mint token coins max supply.
+        let token_balance = coin::mint_balance<T>(&mut tc, DefaultSupply);
         
         freezer::freeze_object<TreasuryCap<T>>(tc, ctx);
 
@@ -148,11 +150,10 @@ module bonding_curve::curve {
         let bc = BondingCurve<T> {
             id: object::new(ctx),
             sui_balance: sui_balance,
-            meme_balance: meme_balance,
+            token_balance: token_balance,
             virtual_sui_amt: configurator.virtual_sui_amt,
             target_supply_threshold: configurator.target_supply_threshold,
             is_active: true,
-            fee: balance::zero<SUI>(),
             swap_fee: configurator.swap_fee,
             creator: tx_context::sender(ctx)
         };
@@ -169,6 +170,7 @@ module bonding_curve::curve {
 
     public fun buy<T>(
         self: &mut BondingCurve<T>, 
+        configurator: &mut Configurator,
         sui_coin: Coin<SUI>,
         min_recieve: u64,
         ctx: &mut TxContext
@@ -177,32 +179,32 @@ module bonding_curve::curve {
         let sender = tx_context::sender(ctx);
         let mut sui_balance = coin::into_balance(sui_coin);
 
-        take_fee(self, &mut sui_balance, sender);
+        take_fee(configurator, self.swap_fee, &mut sui_balance, sender);
 
-        let (reserve_sui, reserve_meme) = get_reserves(self);
+        let (reserve_sui, reserve_token) = get_reserves(self);
         let amount = balance::value<SUI>(&sui_balance);
 
         let output_amount = get_output_amount(
             amount,
             reserve_sui + self.virtual_sui_amt, 
-            reserve_meme
+            reserve_token
         );
         
         assert!(output_amount >= min_recieve, ESwapOutLessthanExpected);
         
         balance::join(&mut self.sui_balance, sui_balance);
 
-        let (reserve_base_post, reserve_meme_post) = get_reserves(self);
-        assert!(reserve_base_post > 0 && reserve_meme_post > 0, EInvalidPoolStatePostSwap);
+        let (reserve_base_post, reserve_token_post) = get_reserves(self);
+        assert!(reserve_base_post > 0 && reserve_token_post > 0, EInvalidPoolStatePostSwap);
 
         // stop trading once threshold is reached
-        if(reserve_meme_post <= self.target_supply_threshold){
+        if(reserve_token_post <= self.target_supply_threshold){
             self.is_active = false;
             emit_migration_pending_event(
                 object::id(self),
                 type_name::into_string(type_name::get<T>()),
                 reserve_base_post,
-                reserve_meme_post
+                reserve_token_post
             );
         };
         emit_swap_event(
@@ -212,38 +214,39 @@ module bonding_curve::curve {
             amount, // input_amount
             output_amount, // output_amount
             reserve_base_post,
-            reserve_meme_post,
+            reserve_token_post,
             sender
         );
 
-        coin::take(&mut self.meme_balance, output_amount, ctx)
+        coin::take(&mut self.token_balance, output_amount, ctx)
     }
 
     public fun sell<T>(
         self: &mut BondingCurve<T>, 
-        meme_coin: Coin<T>,
+        configurator: &mut Configurator,
+        token: Coin<T>,
         min_recieve: u64,
         ctx: &mut TxContext
     ): Coin<SUI> {
         assert!(self.is_active, EPoolNotActiveForTrading);
         let sender = tx_context::sender(ctx);
-        let meme_balance = coin::into_balance(meme_coin);
-        let (reserve_sui, reserve_meme) = get_reserves<T>(self);
-        let amount = balance::value<T>(&meme_balance);
+        let token_balance = coin::into_balance(token);
+        let (reserve_sui, reserve_token) = get_reserves<T>(self);
+        let amount = balance::value<T>(&token_balance);
 
         let output_amount = get_output_amount(
             amount, 
-            reserve_meme, 
+            reserve_token, 
             reserve_sui + self.virtual_sui_amt
         );
         assert!(output_amount >= min_recieve, ESwapOutLessthanExpected);
 
-        balance::join(&mut self.meme_balance, meme_balance);
+        balance::join(&mut self.token_balance, token_balance);
         let mut output_balance = balance::split(&mut self.sui_balance, output_amount);
-        take_fee(self, &mut output_balance, sender);
+        take_fee(configurator, self.swap_fee, &mut output_balance, sender);
 
-        let (reserve_base_post, reserve_meme_post) = get_reserves(self);
-        assert!(reserve_base_post > 0 && reserve_meme_post > 0, EInvalidPoolStatePostSwap);
+        let (reserve_base_post, reserve_token_post) = get_reserves(self);
+        assert!(reserve_base_post > 0 && reserve_token_post > 0, EInvalidPoolStatePostSwap);
 
         emit_swap_event(
             object::id(self),
@@ -252,19 +255,19 @@ module bonding_curve::curve {
             amount, // input_amount
             balance::value<SUI>(&output_balance), // output_amount
             reserve_base_post,
-            reserve_meme_post,
+            reserve_token_post,
             tx_context::sender(ctx)
         );
 
         coin::from_balance(output_balance, ctx)
     }
 
-    public fun migrate_curve<T>(
+    public fun migrate<T>(
         self: &mut BondingCurve<T>, 
         configurator: &mut Configurator,
         target: u64,
         ctx: &mut TxContext
-    ): SafuReceipt<T> {
+    ): MigrationReceipt<T> {
         assert!(!self.is_active, EPoolNotMigratable);
 
         // [1] take migration fee if applicable.
@@ -273,34 +276,31 @@ module bonding_curve::curve {
             balance::join<SUI>(&mut configurator.fee, migration_fee);
         };
 
-        // [2] extract swap fee to configurator
-        transfer_fee_to_configurator(self, configurator, ctx);
+        let (reserve_sui, reserve_token) = get_reserves<T>(self);
 
-        let (reserve_sui, reserve_meme) = get_reserves<T>(self);
-
-        // [3] mint hot potato to transfer funds to target dex for listing.
-        let receipt = safu_receipt::mint<T>(
+        // [2] mint hot potato to transfer funds to target dex for listing.
+        let receipt = migration_receipt::mint<T>(
             target,
             balance::split(&mut self.sui_balance, reserve_sui),
-            balance::split(&mut self.meme_balance, reserve_meme),
+            balance::split(&mut self.token_balance, reserve_token),
             object::id(self)
         );
 
         receipt
     }
 
-    public fun verify_migrated<T>(receipt: SafuReceipt<T>)  {
+    public fun verify_migrated<T>(receipt: MigrationReceipt<T>)  {
         // burn hot potato post listing.
         let (
             bc_id, 
             target, 
             sui_balance_val, 
-            meme_balance_val, 
+            token_balance_val, 
             target_pool_id
-        ) = safu_receipt::burn<T>(receipt);
+        ) = migration_receipt::burn<T>(receipt);
 
         // verify if target dex adapter filled the required values.
-        assert!(sui_balance_val > 0 && meme_balance_val > 0, 0);
+        assert!(sui_balance_val > 0 && token_balance_val > 0, 0);
         assert!(target_pool_id != object::id_from_address(@0x0), 0);
         emit_migration_completed_event(
             target, // adapter_id
@@ -308,16 +308,8 @@ module bonding_curve::curve {
             type_name::into_string(type_name::get<T>()),
             target_pool_id,
             sui_balance_val,
-            meme_balance_val
+            token_balance_val
         );
-    }
-
-    public fun transfer_fee_to_configurator<T>(
-        self: &mut BondingCurve<T>, 
-        configurator: &mut Configurator, 
-        _ctx: &mut TxContext
-    ) {
-        balance::join<SUI>(&mut configurator.fee, extract_all_fee(self));
     }
 
     // admin only operations
@@ -343,7 +335,7 @@ module bonding_curve::curve {
         configurator: &mut Configurator, 
         ctx: &mut TxContext
     ) {
-        let fee_amt = balance::value(configurator.fee);
+        let fee_amt = balance::value(&configurator.fee);
         let sui_balance_1 = balance::split<SUI>(&mut configurator.fee, fee_amt);
         let coin_1 = coin::from_balance<SUI>(sui_balance_1, ctx);
         transfer::public_transfer<Coin<SUI>>(coin_1, tx_context::sender(ctx));
@@ -354,7 +346,7 @@ module bonding_curve::curve {
     public fun get_info<T>(self: &BondingCurve<T>): (u64, u64, u64, u64, bool) {
         (
             balance::value<SUI>(&self.sui_balance),
-            balance::value<T>(&self.meme_balance),
+            balance::value<T>(&self.token_balance),
             self.virtual_sui_amt,
             self.target_supply_threshold,
             self.is_active
@@ -385,22 +377,17 @@ module bonding_curve::curve {
     }
 
     fun get_reserves<T>(self: &BondingCurve<T>): (u64, u64) {
-        (balance::value(&self.sui_balance), balance::value(&self.meme_balance))
+        (balance::value(&self.sui_balance), balance::value(&self.token_balance))
     }
 
-    fun take_fee<T>(self: &mut BondingCurve<T>, sui_balance: &mut Balance<SUI>, sender: address) {
-        let amount = ((((self.swap_fee as u128) * (balance::value<SUI>(sui_balance) as u128)) / FeeScaling) as u64);
+    fun take_fee(configurator: &mut Configurator, swap_fee: u64, sui_balance: &mut Balance<SUI>, sender: address) {
+        let amount = ((((swap_fee as u128) * (balance::value<SUI>(sui_balance) as u128)) / FeeScaling) as u64);
         event::emit(Points {
             amount,
             sender
         });
-        // store fee in bonding curve itself.
-        balance::join<SUI>(&mut self.sui_balance, balance::split(sui_balance, amount));
-    }
-
-    fun extract_all_fee<T>(self: &mut BondingCurve<T>): Balance<SUI> {
-        let val = balance::value<SUI>(&self.fee);
-        balance::split(&mut self.fee, val)
+        // store fee in configurator curve itself.
+        balance::join<SUI>(&mut configurator.fee, balance::split(sui_balance, amount));
     }
 
     fun get_coin_metadata_info<T>(coin_metadata: &CoinMetadata<T>): (ascii::String, string::String, string::String, Option<Url>) {
@@ -422,9 +409,9 @@ module bonding_curve::curve {
     ) {
         let event = BondingCurveListedEvent {
             object_id: object::id(self),
-            meme_type: type_name::into_string(type_name::get<T>()),
+            token_type: type_name::into_string(type_name::get<T>()),
             sui_balance_val: balance::value<SUI>(&self.sui_balance),
-            meme_balance_val: balance::value<T>(&self.meme_balance),
+            token_balance_val: balance::value<T>(&self.token_balance),
             virtual_sui_amt: self.virtual_sui_amt,
             target_supply_threshold: self.target_supply_threshold,
             creator: self.creator,
@@ -440,55 +427,55 @@ module bonding_curve::curve {
 
     public fun emit_swap_event(
         bc_id: ID,
-        meme_type: String,
+        token_type: String,
         is_buy: bool,
         input_amount: u64,
         output_amount: u64,
         sui_reserve_val: u64,
-        meme_reserve_val: u64,
+        token_reserve_val: u64,
         sender: address
     ) {
          event::emit(SwapEvent {
             bc_id,
-            meme_type,
+            token_type,
             is_buy,
             input_amount,
             output_amount,
             sui_reserve_val,
-            meme_reserve_val,
+            token_reserve_val,
             sender
         });
     }
 
     public fun emit_migration_pending_event(
         bc_id: ID,
-        meme_type: String,
+        token_type: String,
         sui_reserve_val: u64,
-        meme_reserve_val: u64
+        token_reserve_val: u64
     ) {
         event::emit(MigrationPendingEvent {
             bc_id,
-            meme_type,
+            token_type,
             sui_reserve_val,
-            meme_reserve_val
+            token_reserve_val
         });
     }
 
     public fun emit_migration_completed_event(
         adapter_id: u64,
         bc_id: ID,
-        meme_type: String,
+        token_type: String,
         target_pool_id: ID,
         sui_balance_val: u64,
-        meme_balance_val: u64
+        token_balance_val: u64
     ) {
         event::emit<MigrationCompletedEvent>(MigrationCompletedEvent {
             adapter_id,
             bc_id,
-            meme_type,
+            token_type,
             target_pool_id,
             sui_balance_val,
-            meme_balance_val
+            token_balance_val
         })
     }
 }
