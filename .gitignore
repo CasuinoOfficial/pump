@@ -132,3 +132,11 @@ build/SniffDotFun/bytecode_modules/*
 build/*
 sniff.fun/build/*
 sniff.fun/Move.lock
+
+pumpup/build/*
+amm/build/*
+amm-insurance-fund/build/*
+amm-math/build/*
+amm-protocol-fee-vault/build/*
+amm-referral-vault/build/*
+amm-treasury/build/*
