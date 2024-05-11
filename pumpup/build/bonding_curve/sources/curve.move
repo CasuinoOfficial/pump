@@ -9,7 +9,6 @@ module bonding_curve::curve {
     use sui::event;
     use bonding_curve::safu_receipt::{Self, SafuReceipt};
     use bonding_curve::freezer;
-    use bonding_curve::admin::{Self, AdminAccess, AdminCap};
 
     // error codes
     const ETreasuryCapSupplyNonZero: u64 = 0;
@@ -74,6 +73,7 @@ module bonding_curve::curve {
     public struct Points has copy, drop {
         amount: u64,
         sender: address,
+        bonding_curve: ID
     }
 
     public struct SwapEvent has copy, drop {
@@ -103,7 +103,15 @@ module bonding_curve::curve {
         meme_balance_val: u64
     }
 
+    public struct AdminCap has key, store {
+        id: UID
+    }
+
     fun init(ctx: &mut TxContext) {
+        let admin = tx_context::sender(ctx);
+        let admin_cap = AdminCap { id: object::new(ctx) };
+        transfer::transfer(admin_cap, admin);
+
         transfer::share_object(Configurator {
             id: object::new(ctx),
             virtual_sui_amt: DefaultVirtualLiquidity,
@@ -251,7 +259,7 @@ module bonding_curve::curve {
         coin::from_balance(output_balance, ctx)
     }
 
-    public fun make_safu<T>(
+    public fun migrate_curve<T>(
         self: &mut BondingCurve<T>, 
         configurator: &mut Configurator,
         target: u64,
@@ -281,7 +289,7 @@ module bonding_curve::curve {
         receipt
     }
 
-    public fun verify_if_safu<T>(receipt: SafuReceipt<T>)  {
+    public fun verify_migrated<T>(receipt: SafuReceipt<T>)  {
         // burn hot potato post listing.
         let (
             bc_id, 
@@ -332,22 +340,13 @@ module bonding_curve::curve {
 
     public fun withdraw_fee(
         _: &AdminCap, 
-        admin_access: &AdminAccess, 
         configurator: &mut Configurator, 
-        val: u64, 
         ctx: &mut TxContext
     ) {
-        let val_by_2 = val / 2;
-        let sui_balance_1 = balance::split<SUI>(&mut configurator.fee, val_by_2);
-        let sui_balance_2 = balance::split<SUI>(&mut configurator.fee, val_by_2);
-
+        let fee_amt = balance::value(configurator.fee);
+        let sui_balance_1 = balance::split<SUI>(&mut configurator.fee, fee_amt);
         let coin_1 = coin::from_balance<SUI>(sui_balance_1, ctx);
-        let coin_2 = coin::from_balance<SUI>(sui_balance_2, ctx);
-
-        let (admin_1, admin_2) = admin::get_addresses(admin_access);
-
-        transfer::public_transfer<Coin<SUI>>(coin_1, admin_1);
-        transfer::public_transfer<Coin<SUI>>(coin_2, admin_2);
+        transfer::public_transfer<Coin<SUI>>(coin_1, tx_context::sender(ctx));
     }
     
     // getters
