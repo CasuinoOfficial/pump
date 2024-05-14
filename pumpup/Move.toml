@@ -6,6 +6,8 @@ edition = "2024.beta"
 [dependencies]
 Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/mainnet", override = true }
 kdx_spot_staging = { local = "../kriya-dex" }
+aftermath = { local = "../amm" }
+clmmpool = { local = "../clmmpool" }
 
 [addresses]
 bonding_curve = "0x0"
