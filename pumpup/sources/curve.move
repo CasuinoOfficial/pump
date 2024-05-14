@@ -41,6 +41,11 @@ module bonding_curve::curve {
         is_active: bool,
         // Metadata Info
         creator: address,
+        twitter: Option<Url>,
+        telegram: Option<Url>,
+        website: Option<Url>,
+        // 0 - Kriya, 1- AF, 2- cetus
+        migration_target: u64
     }
 
     public struct Configurator has key {
@@ -66,7 +71,11 @@ module bonding_curve::curve {
         name: string::String,
         description: string::String,
         url: Option<Url>,
-        coin_metadata_id: ID
+        coin_metadata_id: ID,
+        twitter: Option<Url>,
+        telegram: Option<Url>,
+        website: Option<Url>,
+        migration_target: u64
     }
 
     public struct Points has copy, drop {
@@ -125,6 +134,10 @@ module bonding_curve::curve {
         mut tc: TreasuryCap<T>, 
         coin_metadata: &CoinMetadata<T>,
         sui_coin: Coin<SUI>,
+        twitter: Option<Url>,
+        telegram: Option<Url>,
+        website: Option<Url>,
+        migration_target: u64,
         ctx: &mut TxContext
     ): BondingCurve<T> {
         // total supply of treasury cap should be zero while listing a new token.
@@ -150,7 +163,11 @@ module bonding_curve::curve {
             target_supply_threshold: configurator.target_supply_threshold,
             is_active: true,
             swap_fee: configurator.swap_fee,
-            creator: tx_context::sender(ctx)
+            creator: tx_context::sender(ctx),
+            twitter,
+            telegram,
+            website,
+            migration_target
         };
         let (ticker, name, description, url) = get_coin_metadata_info(coin_metadata);
 
@@ -260,8 +277,6 @@ module bonding_curve::curve {
     public fun migrate<T>(
         self: &mut BondingCurve<T>, 
         configurator: &mut Configurator,
-        target: u64,
-        ctx: &mut TxContext
     ): MigrationReceipt<T> {
         assert!(!self.is_active, EPoolNotMigratable);
 
@@ -275,7 +290,7 @@ module bonding_curve::curve {
 
         // [2] mint hot potato to transfer funds to target dex for listing.
         let receipt = migration_receipt::mint<T>(
-            target,
+            self.migration_target,
             balance::split(&mut self.sui_balance, reserve_sui),
             balance::split(&mut self.token_balance, reserve_token),
             object::id(self)
@@ -329,11 +344,10 @@ module bonding_curve::curve {
         _: &AdminCap, 
         configurator: &mut Configurator, 
         ctx: &mut TxContext
-    ) {
+    ): Coin<SUI> {
         let fee_amt = balance::value(&configurator.fee);
         let sui_balance_1 = balance::split<SUI>(&mut configurator.fee, fee_amt);
-        let coin_1 = coin::from_balance<SUI>(sui_balance_1, ctx);
-        transfer::public_transfer<Coin<SUI>>(coin_1, tx_context::sender(ctx));
+        coin::from_balance<SUI>(sui_balance_1, ctx)
     }
     
     // getters
@@ -414,7 +428,11 @@ module bonding_curve::curve {
             name: name,
             description: description,
             url: url,
-            coin_metadata_id: coin_metadata_id
+            coin_metadata_id: coin_metadata_id,
+            twitter: self.twitter,
+            telegram: self.telegram,
+            website: self.website,
+            migration_target: self.migration_target
         };
 
         event::emit<BondingCurveListedEvent>(event);
