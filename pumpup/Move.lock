@@ -2,11 +2,10 @@
 
 [move]
 version = 1
-manifest_digest = "FF978401E4E45591CE343F223CB0568AE41782021137B7C9A77A38B0BA8ED9A5"
-deps_digest = "3C4103934B1E040BB6B23F1D610B4EF9F2F1166A50A104EADCF77467C004C600"
+manifest_digest = "E5E1757D4EB3CCE6F7F1FA2DFC15D43590D468F0E71B92D68A6DC48AA9947513"
+deps_digest = "F8BBB0CCB2491CA29A3DF03D6F92277A4F3574266507ACD77214D37ECA3F3082"
 dependencies = [
   { name = "Sui" },
-  { name = "kdx_spot_staging" },
 ]
 
 [[move.package]]
@@ -19,14 +18,6 @@ source = { git = "https://github.com/MystenLabs/sui.git", rev = "framework/mainn
 
 dependencies = [
   { name = "MoveStdlib" },
-]
-
-[[move.package]]
-name = "kdx_spot_staging"
-source = { local = "../kriya-dex" }
-
-dependencies = [
-  { name = "Sui" },
 ]
 
 [move.toolchain-version]

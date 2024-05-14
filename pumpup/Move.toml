@@ -5,8 +5,6 @@ edition = "2024.beta"
 
 [dependencies]
 Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/mainnet", override = true }
-kdx_spot_staging = { local = "../kriya-dex" }
 
 [addresses]
 bonding_curve = "0x0"
-kdx_spot = "0xafc6e32a8ff611ba7bdb8d5750ab620b80f2e178768654fe381b03bf09e725fc"

@@ -7,7 +7,7 @@ module bonding_curve::curve {
     use sui::balance::{Self, Balance};
     use sui::sui::{SUI};
     use sui::event;
-    use bonding_curve::migration_receipt::{Self, MigrationReceipt};
+    // use bonding_curve::migration_receipt::{Self, MigrationReceipt};
     use bonding_curve::freezer;
 
     // error codes
@@ -275,9 +275,11 @@ module bonding_curve::curve {
     }
 
     public fun migrate<T>(
+        _: &AdminCap,
         self: &mut BondingCurve<T>, 
         configurator: &mut Configurator,
-    ): MigrationReceipt<T> {
+        ctx: &mut TxContext
+    ): (Coin<SUI>, Coin<T>) {
         assert!(!self.is_active, EPoolNotMigratable);
 
         // [1] take migration fee if applicable.
@@ -286,40 +288,11 @@ module bonding_curve::curve {
             balance::join<SUI>(&mut configurator.fee, migration_fee);
         };
 
+        // [2] return liquidity.
         let (reserve_sui, reserve_token) = get_reserves<T>(self);
-
-        // [2] mint hot potato to transfer funds to target dex for listing.
-        let receipt = migration_receipt::mint<T>(
-            self.migration_target,
-            balance::split(&mut self.sui_balance, reserve_sui),
-            balance::split(&mut self.token_balance, reserve_token),
-            object::id(self)
-        );
-
-        receipt
-    }
-
-    public fun verify_migrated<T>(receipt: MigrationReceipt<T>)  {
-        // burn hot potato post listing.
-        let (
-            bc_id, 
-            target, 
-            sui_balance_val, 
-            token_balance_val, 
-            target_pool_id
-        ) = migration_receipt::burn<T>(receipt);
-
-        // verify if target dex adapter filled the required values.
-        assert!(sui_balance_val > 0 && token_balance_val > 0, 0);
-        assert!(target_pool_id != object::id_from_address(@0x0), 0);
-        emit_migration_completed_event(
-            target, // adapter_id
-            bc_id,
-            type_name::into_string(type_name::get<T>()),
-            target_pool_id,
-            sui_balance_val,
-            token_balance_val
-        );
+        let sui_bal = balance::split(&mut self.sui_balance, reserve_sui);
+        let token_bal = balance::split(&mut self.token_balance, reserve_token);
+        (coin::from_balance(sui_bal, ctx), coin::from_balance(token_bal, ctx))
     }
 
     // admin only operations
