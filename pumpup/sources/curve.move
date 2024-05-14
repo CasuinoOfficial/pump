@@ -41,9 +41,9 @@ module bonding_curve::curve {
         is_active: bool,
         // Metadata Info
         creator: address,
-        twitter: Option<Url>,
-        telegram: Option<Url>,
-        website: Option<Url>,
+        twitter: Option<String>,
+        telegram: Option<String>,
+        website: Option<String>,
         // 0 - Kriya, 1- AF, 2- cetus
         migration_target: u64
     }
@@ -72,9 +72,9 @@ module bonding_curve::curve {
         description: string::String,
         url: Option<Url>,
         coin_metadata_id: ID,
-        twitter: Option<Url>,
-        telegram: Option<Url>,
-        website: Option<Url>,
+        twitter: Option<String>,
+        telegram: Option<String>,
+        website: Option<String>,
         migration_target: u64
     }
 
@@ -134,9 +134,9 @@ module bonding_curve::curve {
         mut tc: TreasuryCap<T>, 
         coin_metadata: &CoinMetadata<T>,
         sui_coin: Coin<SUI>,
-        twitter: Option<Url>,
-        telegram: Option<Url>,
-        website: Option<Url>,
+        twitter: Option<String>,
+        telegram: Option<String>,
+        website: Option<String>,
         migration_target: u64,
         ctx: &mut TxContext
     ): BondingCurve<T> {
@@ -280,7 +280,7 @@ module bonding_curve::curve {
         configurator: &mut Configurator,
         ctx: &mut TxContext
     ): (Coin<SUI>, Coin<T>) {
-        assert!(!self.is_active, EPoolNotMigratable);
+            assert!(!self.is_active, EPoolNotMigratable);
 
         // [1] take migration fee if applicable.
         if(configurator.migration_fee > 0) {
