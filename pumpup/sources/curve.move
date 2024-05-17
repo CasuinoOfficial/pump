@@ -7,7 +7,7 @@ module bonding_curve::curve {
     use sui::balance::{Self, Balance};
     use sui::sui::{SUI};
     use sui::event;
-    // use bonding_curve::migration_receipt::{Self, MigrationReceipt};
+    use std::type_name::{Self};
     use bonding_curve::freezer;
 
     // error codes
@@ -26,7 +26,7 @@ module bonding_curve::curve {
     // default values
     const DefaultSupply: u64 = 1_000_000_000 * 1_000_000_000;
     const DefaultTargetSupplyThreshold: u64 = 200_000_000 * 1_000_000_000;
-    const DefaultVirtualLiquidity: u64 = 5000 * 1_000_000_000;
+    const DefaultVirtualLiquidity: u64 = 3000 * 1_000_000_000;
     const DefaultMigrationFee: u64 = 800 * 1_000_000_000;
     const DefaultListingFee: u64 = 1 * 1_000_000_000;
     const DefaultSwapFee: u64 = 10_000; // 1% fee
@@ -280,8 +280,7 @@ module bonding_curve::curve {
         configurator: &mut Configurator,
         ctx: &mut TxContext
     ): (Coin<SUI>, Coin<T>) {
-            assert!(!self.is_active, EPoolNotMigratable);
-
+        assert!(!self.is_active, EPoolNotMigratable);
         // [1] take migration fee if applicable.
         if(configurator.migration_fee > 0) {
             let migration_fee = balance::split(&mut self.sui_balance, configurator.migration_fee);
@@ -293,6 +292,25 @@ module bonding_curve::curve {
         let sui_bal = balance::split(&mut self.sui_balance, reserve_sui);
         let token_bal = balance::split(&mut self.token_balance, reserve_token);
         (coin::from_balance(sui_bal, ctx), coin::from_balance(token_bal, ctx))
+    }
+
+    public fun confirm_migration(
+        _: &AdminCap,
+        adapter_id: u64,
+        bc_id: ID,
+        token_type: String,
+        target_pool_id: ID,
+        sui_balance_val: u64,
+        token_balance_val: u64
+    ) {
+        emit_migration_completed_event(
+            adapter_id,
+            bc_id,
+            token_type,
+            target_pool_id,
+            sui_balance_val,
+            token_balance_val
+        )
     }
 
     // admin only operations
@@ -433,7 +451,7 @@ module bonding_curve::curve {
         });
     }
 
-    public fun emit_migration_pending_event(
+    fun emit_migration_pending_event(
         bc_id: ID,
         token_type: String,
         sui_reserve_val: u64,
@@ -447,7 +465,7 @@ module bonding_curve::curve {
         });
     }
 
-    public fun emit_migration_completed_event(
+    fun emit_migration_completed_event(
         adapter_id: u64,
         bc_id: ID,
         token_type: String,
