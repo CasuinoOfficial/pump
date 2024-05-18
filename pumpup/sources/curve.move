@@ -7,7 +7,6 @@ module bonding_curve::curve {
     use sui::balance::{Self, Balance};
     use sui::sui::{SUI};
     use sui::event;
-    use std::type_name::{Self};
     use bonding_curve::freezer;
 
     // error codes
@@ -25,7 +24,7 @@ module bonding_curve::curve {
 
     // default values
     const DefaultSupply: u64 = 1_000_000_000 * 1_000_000_000;
-    const DefaultTargetSupplyThreshold: u64 = 400_000_000 * 1_000_000_000;
+    const DefaultTargetSupplyThreshold: u64 = 300_000_000 * 1_000_000_000;
     const DefaultVirtualLiquidity: u64 = 4200 * 1_000_000_000;
     const DefaultMigrationFee: u64 = 300 * 1_000_000_000;
     const DefaultListingFee: u64 = 1 * 1_000_000_000;

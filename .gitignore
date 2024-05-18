@@ -133,6 +133,7 @@ build/*
 sniff.fun/build/*
 sniff.fun/Move.lock
 
+/pumpup/build/*
 pumpup/build/*
 amm/build/*
 amm-insurance-fund/build/*
