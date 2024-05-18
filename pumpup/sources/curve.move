@@ -399,7 +399,7 @@ module bonding_curve::curve {
         (ticker, name, description, url)
     }
 
-    public fun emit_bonding_curve_event<T>(
+    fun emit_bonding_curve_event<T>(
         self: &BondingCurve<T>, 
         ticker: ascii::String, 
         name: string::String,
@@ -429,7 +429,7 @@ module bonding_curve::curve {
         event::emit<BondingCurveListedEvent>(event);
     }
 
-    public fun emit_swap_event(
+    fun emit_swap_event(
         bc_id: ID,
         token_type: String,
         is_buy: bool,
