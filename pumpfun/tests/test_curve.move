@@ -33,7 +33,7 @@ module bonding_curve::bonding_curve_tests {
     use sui::test_scenario::{Self as ts, Scenario};
     use bonding_curve::meme::MEME;
     use sui::coin::{Self};
-    use bonding_curve::curve::{Self, BondingCurve, Configurator};
+    use bonding_curve::curve::{Self, AdminCap, BondingCurve, Configurator};
     use sui::sui::SUI;
     use std::ascii::{Self, String};
 
@@ -74,48 +74,83 @@ module bonding_curve::bonding_curve_tests {
     }
 
     #[test]
-    fun test_bonding_curve() {
-        let scenario_val = setup_for_testing();
+    fun test_buy_and_sell() {
+        let mut scenario_val = setup_for_testing();
+        let scenario = &mut scenario_val;
+        let bob = @0xbb;
+        ts::next_tx(scenario, bob);
+        {
+            let mut configurator = ts::take_shared<Configurator>(scenario);
+            let mut bonding_curve = ts::take_shared<BondingCurve<MEME>>(scenario);
+
+            let result_meme = curve::buy<MEME>(
+                &mut bonding_curve,
+                &mut configurator,
+                coin::mint_for_testing<SUI>(5000 * COIN_SCALER, ts::ctx(scenario)),
+                1,
+                ts::ctx(scenario),
+            );
+            let (sui_reserve, tok_reserve, _, _, _) = curve::get_info<MEME>(&bonding_curve);
+
+            let result_sui = curve::sell<MEME>(
+                &mut bonding_curve,
+                &mut configurator,
+                result_meme,
+                1,
+                ts::ctx(scenario),
+            );
+
+            transfer::public_transfer(result_sui, bob);
+            ts::return_shared(configurator);
+            ts::return_shared(bonding_curve);
+        };
         ts::end(scenario_val);
     }
 
-    // #[test]
-    // fun test_remove_liquidity() {
-    //     let scenario_val = setup_for_testing();
-    //     let scenario = &mut scenario_val;
-    //     let bob = @0xbb;
-    //     ts::next_tx(scenario, bob);
-    //     {
-    //         let pool = ts::take_shared<Pool<MEME>>(scenario);
-    //         let pooler = ts::take_shared<Pooler>(scenario);
+    #[test]
+    fun test_migration_amount() {
+        let mut scenario_val = setup_for_testing();
+        let scenario = &mut scenario_val;
+        let bob = @0xbb;
+        ts::next_tx(scenario, bob);
+        {
+            let mut configurator = ts::take_shared<Configurator>(scenario);
+            let mut bonding_curve = ts::take_shared<BondingCurve<MEME>>(scenario);
 
-    //         let result_meme = curve::buy<MEME>(
-    //             &mut pooler,
-    //             &mut pool,
-    //             coin::mint_for_testing<SUI>(25000 * COIN_SCALER, ts::ctx(scenario)),
-    //             ts::ctx(scenario),
-    //         );
-    //         let (sui_reserve, tok_reserve, _, _, _) = curve::get_info<MEME>(&pool);
+            let result_meme = curve::buy<MEME>(
+                &mut bonding_curve,
+                &mut configurator,
+                coin::mint_for_testing<SUI>(10000 * COIN_SCALER, ts::ctx(scenario)),
+                1,
+                ts::ctx(scenario),
+            );
+            let (sui_reserve, tok_reserve, _, _, is_active) = curve::get_info<MEME>(&bonding_curve);
 
-    //         let result_sui = curve::sell<MEME>(
-    //             &mut pooler,
-    //             &mut pool,
-    //             result_meme,
-    //             ts::ctx(scenario),
-    //         );
+            // Assert pool is not active
+            assert!(is_active == false, 0);
+            transfer::public_transfer(result_meme, bob);
+            ts::return_shared(configurator);
+            ts::return_shared(bonding_curve);
+        };
+        ts::next_tx(scenario, ADMIN);
+        {
+            let admin_cap = ts::take_from_sender<AdminCap>(scenario);
+            let mut configurator = ts::take_shared<Configurator>(scenario);
+            let mut bonding_curve = ts::take_shared<BondingCurve<MEME>>(scenario);
+            let (sui_coin, meme_coin) = curve::migrate<MEME>(
+                &admin_cap,
+                &mut bonding_curve,
+                &mut configurator,
+                ts::ctx(scenario),
+            );
+            transfer::public_transfer(sui_coin, ADMIN);
+            transfer::public_transfer(meme_coin, ADMIN);
 
-    //         // std::debug::print(&result_meme);
-    //         transfer::public_transfer(result_sui, bob);
-    //         // std::debug::print(&sui_reserve);
-    //         // std::debug::print(&tok_reserve);
-    //         ts::return_shared(pool);
-    //         ts::return_shared(pooler);
-    //     };
-    //     ts::end(scenario_val);
+            ts::return_to_sender(scenario, admin_cap);
+            ts::return_shared(configurator);
+            ts::return_shared(bonding_curve);
+        };
+        ts::end(scenario_val);
+    }
 
-    //     // assert removing from pool works
-
-    //     // set liquidity to 0
-    //     // assert removing from pool fails
-    // }
 }

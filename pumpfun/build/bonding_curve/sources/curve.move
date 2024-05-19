@@ -204,11 +204,10 @@ module bonding_curve::curve {
         assert!(output_amount >= min_recieve, ESwapOutLessthanExpected);
         
         balance::join(&mut self.sui_balance, sui_balance);
-
+        let target_coin = coin::take(&mut self.token_balance, output_amount, ctx);
+        // stop trading once threshold is reached
         let (reserve_base_post, reserve_token_post) = get_reserves(self);
         assert!(reserve_base_post > 0 && reserve_token_post > 0, EInvalidPoolStatePostSwap);
-
-        // stop trading once threshold is reached
         if(reserve_token_post <= self.target_supply_threshold){
             self.is_active = false;
             emit_migration_pending_event(
@@ -218,6 +217,7 @@ module bonding_curve::curve {
                 reserve_token_post
             );
         };
+
         emit_swap_event(
             object::id(self),
             type_name::into_string(type_name::get<T>()),
@@ -228,8 +228,7 @@ module bonding_curve::curve {
             reserve_token_post,
             sender
         );
-
-        coin::take(&mut self.token_balance, output_amount, ctx)
+        target_coin
     }
 
     public fun sell<T>(
