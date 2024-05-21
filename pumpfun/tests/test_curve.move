@@ -153,4 +153,34 @@ module bonding_curve::bonding_curve_tests {
         ts::end(scenario_val);
     }
 
+    #[test]
+    fun test_max_buy() {
+        let mut scenario_val = setup_for_testing();
+        let scenario = &mut scenario_val;
+        let bob = @0xbb;
+        ts::next_tx(scenario, bob);
+        {
+            let mut configurator = ts::take_shared<Configurator>(scenario);
+            let mut bonding_curve = ts::take_shared<BondingCurve<MEME>>(scenario);
+
+            let result_meme = curve::buy<MEME>(
+                &mut bonding_curve,
+                &mut configurator,
+                coin::mint_for_testing<SUI>(500000000 * COIN_SCALER, ts::ctx(scenario)),
+                1,
+                ts::ctx(scenario),
+            );
+            let (sui_reserve, tok_reserve, _, _, is_active) = curve::get_info<MEME>(&bonding_curve);
+            std::debug::print(&tok_reserve);
+            std::debug::print(&sui_reserve);
+
+            // Assert pool is not active
+            assert!(is_active == false, 0);
+            transfer::public_transfer(result_meme, bob);
+            ts::return_shared(configurator);
+            ts::return_shared(bonding_curve);
+        };
+        ts::end(scenario_val);
+    }
+
 }

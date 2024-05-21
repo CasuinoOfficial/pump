@@ -5,7 +5,7 @@ compiled_package_info:
     bonding_curve: "0000000000000000000000000000000000000000000000000000000000000000"
     std: "0000000000000000000000000000000000000000000000000000000000000001"
     sui: "0000000000000000000000000000000000000000000000000000000000000002"
-  source_digest: DB557F4B6242AC997F8A5FE5A085A425D680AE8C28A29C1C7A7101DC44DEF6BD
+  source_digest: F69F17DDE6977BA9B68A3F2BAAE4CE947AD4F81E430DC5A21394A9F65AA9D689
   build_flags:
     dev_mode: true
     test_mode: true
@@ -20,7 +20,6 @@ compiled_package_info:
     deps_as_root: false
     silence_warnings: false
     warnings_are_errors: false
-    json_errors: false
     additional_named_addresses: {}
     lint_flag:
       no_lint: false

@@ -1,0 +1,19 @@
+
+Package ID
+```
+0x3f2a0baf78f98087a04431f848008bad050cb5f4427059fa08eeefaa94d56cca
+```
+
+Configurator 116310437
+```
+0x97f24f964264611bf19e396fe25e1fb04a2bc36e66f177621ae9a5e0206745c5
+```
+
+UpgradeCap
+```
+0xd68aaf4a59a8acc0399b1b67afe027313981bce7b66a0d44bb4d7f35eef4ba69
+```
+AdminCap
+```
+0xdeaf739afde09a2c5daa98f1ed802ce0d13fa539a5090faa95336891a41f8b86
+```
