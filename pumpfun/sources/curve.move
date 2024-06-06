@@ -283,6 +283,10 @@ module bonding_curve::curve {
         if(configurator.migration_fee > 0) {
             let migration_fee = balance::split(&mut self.sui_balance, configurator.migration_fee);
             balance::join<SUI>(&mut configurator.fee, migration_fee);
+            event::emit(Points {
+                amount: configurator.migration_fee,
+                sender: tx_context::sender(ctx)
+            });
         };
 
         // [2] return liquidity.
