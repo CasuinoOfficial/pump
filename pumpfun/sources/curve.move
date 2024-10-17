@@ -7,7 +7,6 @@ module bonding_curve::curve {
     use sui::balance::{Self, Balance};
     use sui::sui::{SUI};
     use sui::event;
-    use bonding_curve::freezer;
 
     // error codes
     const ETreasuryCapSupplyNonZero: u64 = 0;
@@ -25,10 +24,11 @@ module bonding_curve::curve {
     // default values
     const DefaultSupply: u64 = 1_000_000_000 * 1_000_000_000;
     const DefaultTargetSupplyThreshold: u64 = 300_000_000 * 1_000_000_000;
-    const DefaultVirtualLiquidity: u64 = 4200 * 1_000_000_000;
-    const DefaultMigrationFee: u64 = 300 * 1_000_000_000;
+    const DefaultVirtualLiquidity: u64 = 2000 * 1_000_000_000;
+    const DefaultMigrationFee: u64 = 200 * 1_000_000_000;
     const DefaultListingFee: u64 = 1 * 1_000_000_000;
     const DefaultSwapFee: u64 = 10_000; // 1% fee
+    const BURN_ADDRESS: address = @0x0000000000000000000000000000000000000000000000000000000000000000;
 
     public struct BondingCurve<phantom T> has key {
         id: UID,
@@ -147,8 +147,7 @@ module bonding_curve::curve {
 
         // mint token coins max supply.
         let token_balance = coin::mint_balance<T>(&mut tc, DefaultSupply);
-        
-        freezer::freeze_object<TreasuryCap<T>>(tc, ctx);
+        transfer::public_transfer(tc, BURN_ADDRESS);
 
         // collect listing fee.
         let listing_fee = balance::split(&mut sui_balance, configurator.listing_fee);
@@ -514,15 +513,8 @@ module bonding_curve::curve {
         ctx: &mut TxContext
     ): BondingCurve<T> {
         // total supply of treasury cap should be zero while listing a new token.
-        // assert!(coin::total_supply<T>(&tc) == 0, ETreasuryCapSupplyNonZero);
-        // assert!(coin::get_decimals<T>(coin_metadata) == TokenDecimals, EInvalidTokenDecimals);
         let mut sui_balance = coin::into_balance(sui_coin);
-        // assert!(balance::value(&sui_balance) == configurator.listing_fee, EInsufficientSuiBalance);
         let mut token_balance = coin::into_balance(token_coin);
-
-        // mint token coins max supply.
-        // let token_balance = coin::mint_balance<T>(&mut tc, DefaultSupply);
-        // freezer::freeze_object<TreasuryCap<T>>(tc, ctx);
 
         // collect listing fee.
         let listing_fee = balance::split(&mut sui_balance, configurator.listing_fee);
@@ -543,9 +535,6 @@ module bonding_curve::curve {
             migration_target
         };
 
-        // let (ticker, name, description, url) = get_coin_metadata_info(coin_metadata);
-
-        // emit_bonding_curve_event(&bc, ticker, name, description, url, object::id(coin_metadata));
         bc
     }
 
