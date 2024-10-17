@@ -142,3 +142,5 @@ amm-math/build/*
 amm-protocol-fee-vault/build/*
 amm-referral-vault/build/*
 amm-treasury/build/*
+pumpfun/build/
+pumpfun/build/*
