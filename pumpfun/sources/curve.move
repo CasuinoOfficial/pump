@@ -10,8 +10,8 @@ use sui::{
     coin::{Self, CoinMetadata, TreasuryCap, Coin},
     balance::{Self, Balance},
     sui::SUI,
+    dynamic_field as df,
     event,
-    table::{Self, Table},
 };
 
 // error codes
@@ -61,7 +61,6 @@ public struct Configurator has key {
     listing_fee: u64,
     swap_fee: u64,
     fee: Balance<SUI>,
-    record: Table<String, ID>,
 }
 
 // events
@@ -132,7 +131,6 @@ fun init(ctx: &mut TxContext) {
         listing_fee: DefaultListingFee,
         fee: balance::zero<SUI>(),
         swap_fee: DefaultSwapFee,
-        record: table::new<String, ID>(ctx),
     });
 }
 
@@ -176,7 +174,7 @@ public fun list<T>(
         migration_target
     };
     let coin_type = type_name::into_string(type_name::get<T>());
-    table::add<String, ID>(&mut configurator.record, coin_type, object::id(&bc));
+    df::add<String, ID>(&mut configurator.id, coin_type, object::id(&bc));
     let (ticker, name, description, url) = get_coin_metadata_info(coin_metadata);
 
     emit_bonding_curve_event(&bc, ticker, name, description, url, object::id(coin_metadata));
