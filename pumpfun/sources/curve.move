@@ -1,12 +1,17 @@
 module bonding_curve::curve {
-    use std::type_name;
-    use std::string;
-    use sui::url::{Url};
-    use std::ascii::{Self, String};
-    use sui::coin::{Self, CoinMetadata, TreasuryCap, Coin};
-    use sui::balance::{Self, Balance};
-    use sui::sui::{SUI};
-    use sui::event;
+    use std::{
+        type_name,
+        ascii::{Self, String},
+        string
+    };
+    use sui::{
+        url::Url,
+        coin::{Self, CoinMetadata, TreasuryCap, Coin},
+        balance::{Self, Balance},
+        sui::SUI,
+        event,
+        table::{Self, Table},
+    };
 
     // error codes
     const ETreasuryCapSupplyNonZero: u64 = 0;
@@ -54,7 +59,8 @@ module bonding_curve::curve {
         migration_fee: u64,
         listing_fee: u64,
         swap_fee: u64,
-        fee: Balance<SUI>
+        fee: Balance<SUI>,
+        record: Table<String, ID>,
     }
 
     // events
@@ -124,7 +130,8 @@ module bonding_curve::curve {
             migration_fee: DefaultMigrationFee,
             listing_fee: DefaultListingFee,
             fee: balance::zero<SUI>(),
-            swap_fee: DefaultSwapFee
+            swap_fee: DefaultSwapFee,
+            record: table::new<String, ID>(ctx),
         });
     }
 
@@ -167,6 +174,8 @@ module bonding_curve::curve {
             website,
             migration_target
         };
+        let coin_type = type_name::into_string(type_name::get<T>());
+        table::add<String, ID>(&mut configurator.record, coin_type, object::id(&bc));
         let (ticker, name, description, url) = get_coin_metadata_info(coin_metadata);
 
         emit_bonding_curve_event(&bc, ticker, name, description, url, object::id(coin_metadata));
