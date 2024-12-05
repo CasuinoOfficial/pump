@@ -183,4 +183,46 @@ module bonding_curve::bonding_curve_tests {
         ts::end(scenario_val);
     }
 
+    #[test]
+    fun test_migration_math() {
+        let mut scenario_val = setup_for_testing();
+        let scenario = &mut scenario_val;
+        let bob = @0xbb;
+        ts::next_tx(scenario, ADMIN);
+        {
+            let mut configurator = ts::take_shared<Configurator>(scenario);
+            let admin_cap = ts::take_from_sender<AdminCap>(scenario);
+            curve::update_virtual_sui_liq(
+                &admin_cap,
+                &mut configurator,
+                300 * COIN_SCALER
+            );
+            ts::return_shared(configurator);
+            scenario.return_to_sender(admin_cap);
+        };
+
+        ts::next_tx(scenario, bob);
+        {
+            let mut configurator = ts::take_shared<Configurator>(scenario);
+            let mut bonding_curve = ts::take_shared<BondingCurve<MEME>>(scenario);
+
+            let result_meme = curve::buy<MEME>(
+                &mut bonding_curve,
+                &mut configurator,
+                coin::mint_for_testing<SUI>(4750 * COIN_SCALER, ts::ctx(scenario)),
+                1,
+                ts::ctx(scenario),
+            );
+            let (sui_reserve, tok_reserve, _, _, is_active) = curve::get_info<MEME>(&bonding_curve);
+            std::debug::print(&tok_reserve);
+            std::debug::print(&sui_reserve);
+
+            // Assert pool is not active
+            transfer::public_transfer(result_meme, bob);
+            ts::return_shared(configurator);
+            ts::return_shared(bonding_curve);
+        };
+        ts::end(scenario_val);
+    }
+
 }
