@@ -303,6 +303,30 @@ public fun migrate<T>(
     (coin::from_balance(sui_bal, ctx), coin::from_balance(token_bal, ctx))
 }
 
+public fun force_migrate<T>(
+    _: &AdminCap,
+    self: &mut BondingCurve<T>, 
+    configurator: &mut Configurator,
+    ctx: &mut TxContext
+): (Coin<SUI>, Coin<T>) {
+    self.is_active = false;
+    // [1] take migration fee if applicable.
+    if(configurator.migration_fee > 0) {
+        let migration_fee = balance::split(&mut self.sui_balance, configurator.migration_fee);
+        balance::join<SUI>(&mut configurator.fee, migration_fee);
+        event::emit(Points {
+            amount: configurator.migration_fee,
+            sender: tx_context::sender(ctx)
+        });
+    };
+
+    // [2] return liquidity.
+    let (reserve_sui, reserve_token) = get_reserves<T>(self);
+    let sui_bal = balance::split(&mut self.sui_balance, reserve_sui);
+    let token_bal = balance::split(&mut self.token_balance, reserve_token);
+    (coin::from_balance(sui_bal, ctx), coin::from_balance(token_bal, ctx))
+}
+
 public fun confirm_migration(
     _: &AdminCap,
     adapter_id: u64,
@@ -404,7 +428,6 @@ fun get_coin_metadata_info<T>(coin_metadata: &CoinMetadata<T>): (ascii::String, 
     let name = coin::get_name<T>(coin_metadata);
     let description = coin::get_description<T>(coin_metadata);
     let url = coin::get_icon_url<T>(coin_metadata);
-
     (ticker, name, description, url)
 }
 
